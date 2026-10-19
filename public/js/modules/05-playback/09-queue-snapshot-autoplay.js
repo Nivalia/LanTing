@@ -14,7 +14,7 @@ function playbackRestoreSongSnapshot(song) {
   var snap = {};
   [
     'provider', 'source', 'type', 'id', 'mid', 'songmid', 'mediaMid', 'media_mid', 'qqId',
-    'spotifyId', 'spotifyUri', 'spotifyUrl', 'uri', 'albumUri',
+    'spotifyId', 'spotifyUri', 'spotifyUrl', 'uri', 'albumUri', 'previewUrl',
     'hash', 'fileHash', 'audioHash', 'albumId', 'album_id', 'albumMid', 'albummid', 'albumAudioId', 'album_audio_id', 'mixSongId', 'hqHash', 'sqHash', 'resHash',
     'name', 'title', 'artist', 'album', 'cover', 'duration', 'durationMs', 'dt', 'fee',
     'playable', 'playbackMode', 'recommendationSource', 'programId', 'radioId', 'radioName', 'localKey', 'localFileId'

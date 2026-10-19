@@ -1933,6 +1933,41 @@ async function checkSpotifyProviderGuard() {
   console.log('[OK] Spotify Web API match source is guarded across backend, UI, playback fallback, lyrics, and packaging.');
 }
 
+function checkSpotifyPreviewMatchQualityGuard() {
+  logStep('Spotify preview fallback and match quality guard');
+  const fallbackText = fs.readFileSync(path.join(appRoot, 'public', 'js', 'modules', '05-playback', '11-provider-fallback.js'), 'utf8');
+  const snapshotText = fs.readFileSync(path.join(appRoot, 'public', 'js', 'modules', '05-playback', '09-queue-snapshot-autoplay.js'), 'utf8');
+
+  const previewCallSites = (fallbackText.match(/trySourceFallbackSpotifyPreview\(/g) || []).length;
+  if (!/function sourceFallbackSpotifyPreviewUrl\(song, data\)/.test(fallbackText)) {
+    fail('spotify preview fallback must expose a guarded preview URL resolver');
+  }
+  if (previewCallSites < 3) {
+    fail(`spotify preview fallback must be tried at both terminal branches (found ${previewCallSites} references)`);
+  }
+  if (!/previewSeconds:\s*30/.test(fallbackText)) {
+    fail('spotify preview playback must declare its 30-second preview contract');
+  }
+  if (!/recovery\.deadlineAt\s*=\s*Date\.now\(\)\s*\+\s*SOURCE_FALLBACK_RECOVERY_TIMEOUT_MS/.test(fallbackText)) {
+    fail('spotify preview attempt must refresh the recovery budget window before its final action');
+  }
+  if (!/'previewUrl'/.test(snapshotText)) {
+    fail('queue snapshot whitelist must preserve previewUrl so restored queues keep 30s preview capability');
+  }
+  for (const helper of ['sourceFallbackCandidateScore', 'sourceFallbackDurationLooksWrong', 'sourceFallbackMatchFailureMessage', 'sourceFallbackTally']) {
+    if (!new RegExp(`function ${helper}\\(`).test(fallbackText)) {
+      fail(`match quality must stay scored and explained (missing ${helper})`);
+    }
+  }
+  if (!/issue = 'duration_mismatch'/.test(fallbackText) || !/score \+= 40/.test(fallbackText)) {
+    fail('alternate match must reject duration outliers and weight album affinity');
+  }
+  if (!/matchRejectTally/.test(fallbackText)) {
+    fail('failed source switches must tally rejection reasons for a specific user message');
+  }
+  console.log('[OK] Spotify 30s preview is the bounded last resort, and alternate matching scores album/duration with reason-specific failure copy.');
+}
+
 function checkPlaybackControlBadgesGuard() {
   logStep('Playback control source/VIP badge guard');
   const indexText = fs.readFileSync(path.join(appRoot, 'public', 'index.html'), 'utf8');
@@ -1961,7 +1996,7 @@ function checkPlaybackControlBadgesGuard() {
     /function sourceCandidateRejectReason/.test(searchText) &&
     /function findControlSourceMatchResult/.test(searchText) &&
     /function controlSourceIssueLabel/.test(searchText) &&
-    /sourceCandidateRejectReason\(song, list\[i\], target\)/.test(fallbackText) &&
+    /sourceCandidateRejectReason\(song, (?:list\[i\]|candidate), target\)/.test(fallbackText) &&
     /sourceCandidateRejectReason\(song, candidate, 'netease'\)/.test(lyricFetchText);
   if (!/control-title-text/.test(indexText) || !/control-title-badges/.test(indexText)) {
     fail('bottom player title must reserve inline spans for source and VIP badges');
@@ -5637,6 +5672,7 @@ async function main() {
   checkLyricVerticalFloatToggleGuard();
   checkQishuiProviderGuard();
   await checkSpotifyProviderGuard();
+  checkSpotifyPreviewMatchQualityGuard();
   checkPlaybackControlBadgesGuard();
   await checkProviderFallbackTerminalStateGuard();
   checkSearchGlassEntranceGuard();

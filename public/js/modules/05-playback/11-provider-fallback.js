@@ -502,12 +502,84 @@ async function searchAlternatePlatformSong(song, requestedTarget, recovery) {
     recovery
   );
   if (data === sourceFallbackBudgetTimeoutResult || (recovery && !sourceFallbackRecoveryCanContinue(recovery))) return null;
-  var list = data && (data.songs || data.result || []);
+  var list = (data && (data.songs || data.result || [])) || [];
+  var best = null;
+  var bestScore = -1;
   for (var i = 0; i < list.length; i++) {
-    if (typeof sourceCandidateRejectReason === 'function' && sourceCandidateRejectReason(song, list[i], target)) continue;
-    if (isSameTitleArtist(song, list[i])) return cloneSong(list[i]);
+    var candidate = list[i];
+    var issue = typeof sourceCandidateRejectReason === 'function' ? sourceCandidateRejectReason(song, candidate, target) : '';
+    if (!issue && !isSameTitleArtist(song, candidate)) issue = 'unmatched';
+    if (!issue && sourceFallbackDurationLooksWrong(song, candidate)) issue = 'duration_mismatch';
+    if (issue) {
+      sourceFallbackTally(recovery, issue);
+      continue;
+    }
+    var score = sourceFallbackCandidateScore(song, candidate, i);
+    if (score > bestScore) {
+      bestScore = score;
+      best = candidate;
+    }
   }
-  return null;
+  if (!best) return null;
+  return cloneSong(best);
+}
+var SOURCE_FALLBACK_REJECT_LABELS = {
+  derivative: '属于 Live/翻唱/Remix 等不同版本',
+  title_mismatch: '歌名不一致',
+  artist_mismatch: '歌手对不上',
+  artist_extra: '不是原唱版本',
+  blocked_artist: '命中翻唱禁用',
+  duration_mismatch: '时长差异过大',
+  no_audio_url: '取不到可播音频',
+  unmatched: '没有同名同歌手候选',
+};
+function sourceFallbackTally(recovery, key, count) {
+  if (!recovery || !key) return;
+  if (!recovery.matchRejectTally) recovery.matchRejectTally = {};
+  recovery.matchRejectTally[key] = (Number(recovery.matchRejectTally[key]) || 0) + (count || 1);
+}
+function sourceFallbackDurationLooksWrong(source, candidate) {
+  if (typeof playbackDurationFromSong !== 'function') return false;
+  var sourceSec = playbackDurationFromSong(source);
+  var candidateSec = playbackDurationFromSong(candidate);
+  if (!(sourceSec > 0) || !(candidateSec > 0)) return false;
+  return Math.abs(sourceSec - candidateSec) > Math.max(45, sourceSec * 0.4);
+}
+function sourceFallbackCandidateScore(source, candidate, rank) {
+  var score = Math.max(0, 10 - (Number(rank) || 0) * 0.5);
+  if (typeof normalizeMatchText === 'function') {
+    var sourceAlbum = normalizeMatchText(source && source.album);
+    var candidateAlbum = normalizeMatchText(candidate && candidate.album);
+    if (sourceAlbum && candidateAlbum && (candidateAlbum === sourceAlbum || candidateAlbum.indexOf(sourceAlbum) >= 0 || sourceAlbum.indexOf(candidateAlbum) >= 0)) {
+      score += 40;
+    }
+  }
+  if (typeof playbackDurationFromSong === 'function') {
+    var sourceSec = playbackDurationFromSong(source);
+    var candidateSec = playbackDurationFromSong(candidate);
+    if (sourceSec > 0 && candidateSec > 0) score += Math.max(0, 30 - Math.abs(sourceSec - candidateSec));
+  }
+  return score;
+}
+function sourceFallbackMatchFailureMessage(recovery, alternateProviders) {
+  var labels = (alternateProviders || []).map(sourceFallbackProviderTitle).join('、');
+  var tally = recovery && recovery.matchRejectTally || {};
+  var seen = 0;
+  var reasonKeys = [];
+  Object.keys(tally).forEach(function (key) {
+    var count = Number(tally[key]) || 0;
+    if (!count || key === 'no_audio_url') return;
+    seen += count;
+    if (SOURCE_FALLBACK_REJECT_LABELS[key] && reasonKeys.indexOf(key) < 0) reasonKeys.push(key);
+  });
+  if (Number(tally.no_audio_url) > 0) {
+    return '在' + labels + '匹配到同版本候选，但取不到可播音频，正在播放下一首。';
+  }
+  if (seen > 0 && reasonKeys.length) {
+    var reasons = reasonKeys.slice(0, 2).map(function (key) { return SOURCE_FALLBACK_REJECT_LABELS[key]; }).join('，');
+    return '在' + labels + '搜到 ' + seen + ' 个候选，但' + reasons + '，正在播放下一首。';
+  }
+  return '没有找到可播放的已登录平台版本，正在播放下一首。';
 }
 function sourceFallbackSongKey(song) {
   if (!song) return '';
@@ -645,6 +717,46 @@ async function skipFailedQueueItem(idx, token, message, opts) {
   }
   return nextStarted === true;
 }
+function sourceFallbackSpotifyPreviewUrl(song, data) {
+  if (!song || songProviderKey(song) !== 'spotify') return '';
+  var raw = String((data && (data.previewUrl || data.preview_url)) || song.previewUrl || song.preview_url || '').trim();
+  return /^https?:\/\/\S+/i.test(raw) ? raw : '';
+}
+async function trySourceFallbackSpotifyPreview(song, data, idx, token, opts, recovery) {
+  var previewUrl = sourceFallbackSpotifyPreviewUrl(song, data);
+  if (!previewUrl) return null;
+  if (token !== trackSwitchToken) return false;
+  if (!sourceFallbackRecoveryIdentityActive(recovery)) return null;
+  // 预览是换源链条的终局动作：为其刷新完整预算窗口，避免启动瞬间跨过 deadline 被当作超时中止。
+  recovery.deadlineAt = Date.now() + SOURCE_FALLBACK_RECOVERY_TIMEOUT_MS;
+  if (!sourceFallbackRecoveryCanContinue(recovery)) return null;
+  var previewOpts = {
+    fallbackDepth: 1,
+    startupAutoplay: !!opts.startupAutoplay,
+    preserveHomeState: !!opts.preserveHomeState,
+    suppressPlayFailureNotice: true,
+    preResolvedPlaybackData: {
+      url: previewUrl,
+      playable: true,
+      level: 'standard',
+      provider: 'spotify',
+      source: 'spotify-preview',
+      preview: true,
+      previewSeconds: 30
+    },
+    sourceFallbackRecovery: recovery
+  };
+  var previewPromise = playQueueAt(idx, previewOpts);
+  var previewToken = trackSwitchToken;
+  var previewStarted = await previewPromise;
+  if (previewToken !== trackSwitchToken) return false;
+  if (previewStarted !== true) return null;
+  completeSourceFallbackRecovery(recovery);
+  if (!opts.startupAutoplay) {
+    showSourceFallbackNotice('播放 30 秒试听', '没有找到可换源的完整版本，正在播放 Spotify 官方 30 秒预览；试听结束后会继续下一首。');
+  }
+  return true;
+}
 async function tryAutoPlaybackFallback(song, data, idx, token, opts) {
   opts = opts || {};
   if (opts.fallbackDepth > 0) {
@@ -673,6 +785,8 @@ async function tryAutoPlaybackFallback(song, data, idx, token, opts) {
     return settleSourceFallbackTerminal(idx, token, '自动恢复已达到时间上限，请稍后手动重试。', skipOpts);
   }
   if (!alternateProviders.length) {
+    var noAlternatePreview = await trySourceFallbackSpotifyPreview(song, data, idx, token, opts, recovery);
+    if (noAlternatePreview !== null) return noAlternatePreview;
     return await skipFailedQueueItem(idx, token, '当前歌曲不可播放，且没有其它已登录、已授权的音乐平台可接管。', skipOpts);
   }
   if (!opts.startupAutoplay) {
@@ -701,7 +815,10 @@ async function tryAutoPlaybackFallback(song, data, idx, token, opts) {
       if (alternateData === sourceFallbackBudgetTimeoutResult || !sourceFallbackRecoveryCanContinue(recovery)) {
         return settleSourceFallbackTerminal(idx, token, '自动恢复已达到时间上限，请稍后手动重试。', skipOpts);
       }
-      if (!alternateData || !alternateData.url) continue;
+      if (!alternateData || !alternateData.url) {
+        sourceFallbackTally(recovery, 'no_audio_url');
+        continue;
+      }
       var originalSong = playQueue[idx];
       alternate.autoFallbackFrom = songProviderKey(song);
       var committedCandidate = hydrateCustomCover(alternate);
@@ -742,7 +859,9 @@ async function tryAutoPlaybackFallback(song, data, idx, token, opts) {
       console.warn('[SourceFallback]', alternateProvider, e && (e.message || e));
     }
   }
-  return await skipFailedQueueItem(idx, token, '没有找到可播放的已登录平台版本，正在播放下一首。', skipOpts);
+  var previewFallback = await trySourceFallbackSpotifyPreview(song, data, idx, token, opts, recovery);
+  if (previewFallback !== null) return previewFallback;
+  return await skipFailedQueueItem(idx, token, sourceFallbackMatchFailureMessage(recovery, alternateProviders), skipOpts);
 }
 function handlePlaybackUnavailable(song, data) {
   hideLoading();
