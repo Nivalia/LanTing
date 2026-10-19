@@ -173,6 +173,9 @@ function makeHarness(options = {}) {
     'readPlaybackAnalyserSignal',
     'rebuildPlaybackGraphWithCapture',
     'schedulePlaybackAnalyserRecovery',
+    'ensureVocalRemovePreference',
+    'buildVocalRemoveStage',
+    'applyVocalRemoveGains',
   ];
   const executableSource = [
     ...functionNames.map((name) => extractFunction(sourceText, name)),
@@ -189,6 +192,12 @@ function makeHarness(options = {}) {
     beatAnalyser: null,
     gainNode: null,
     analysisSinkNode: null,
+    vocalRemoveStage: null,
+    vocalRemoveEnabled: false,
+    vocalRemovePreferenceHydrated: false,
+    VOCAL_REMOVE_STORE_KEY: 'lanting-vocal-remove-v1',
+    localStorage: { getItem() { return null; }, setItem() {} },
+    saveBooleanPreference() {},
     FFT_SIZE: 2048,
     BEAT_FFT_SIZE: 512,
     frequencyData: new Uint8Array(1024),

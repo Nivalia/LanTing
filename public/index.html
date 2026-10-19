@@ -118,6 +118,8 @@
           <button id="search-mode-spotify" type="button" onclick="setSearchMode('spotify')" aria-selected="false">SP</button>
           <button id="search-mode-podcast" type="button" onclick="setSearchMode('podcast')"
             aria-selected="false">Podcast</button>
+          <button id="search-instrumental-toggle" type="button" onclick="toggleInstrumentalSearchMode()"
+            aria-pressed="false" title="优先搜索伴奏 / 纯音乐版本">伴奏</button>
         </div>
         <div id="search-results"></div>
       </div>
@@ -1000,6 +1002,12 @@
                 onclick="refreshAudioOutputDevices(true)">刷新</button><button class="quality-output-refresh" type="button"
                 onclick="openAudioOutputWorkflowPanel()">面板</button></span></div>
             <div id="audio-output-list" class="audio-output-list"></div>
+          </div>
+          <div class="fx-section-label">人声处理</div>
+          <div class="fx-toggle-grid">
+            <div class="fx-toggle" id="t-vocalRemove" onclick="toggleVocalRemove()"
+              title="中置声道相消：去掉居中人声只留伴奏声场；单声道音源不受影响">
+              <span>人声消除（卡拉 OK）</span><span class="dot"></span></div>
           </div>
           <div class="fx-section-label">画质档位</div>
           <div class="fx-seg" id="performance-quality-seg" title="控制可见状态下的渲染像素预算，重启后保留">

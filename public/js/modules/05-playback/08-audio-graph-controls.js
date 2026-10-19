@@ -2,11 +2,81 @@
 function audioGraphHealthy() {
   return !!(audio && audioReady && audioCtx && audioCtx.state !== 'closed' && source && audioSourceMedia === audio && analyser && beatAnalyser && (gainNode || analysisSinkNode));
 }
+// ---- 人声消除（中置声道相消 / 卡拉 OK）----
+// 湿路 = L - R（中心声像相消，只留伴奏声场）；干路 = 原始立体声。
+// splitter 按离散解释拆分：单声道输入得到 [c0, 0]，湿路输出原样信号 ——
+// 单声道音源既不会被静音，也不会被误处理，无需额外守卫分支。
+var vocalRemoveStage = null;
+function ensureVocalRemovePreference() {
+  if (vocalRemovePreferenceHydrated) return !!vocalRemoveEnabled;
+  vocalRemovePreferenceHydrated = true;
+  try { vocalRemoveEnabled = localStorage.getItem(VOCAL_REMOVE_STORE_KEY) === '1'; } catch (e) { vocalRemoveEnabled = false; }
+  return !!vocalRemoveEnabled;
+}
+function buildVocalRemoveStage(ctx, srcNode, destNode) {
+  if (!ctx || !ctx.createChannelSplitter || !ctx.createChannelMerger || !srcNode || !destNode) return null;
+  try {
+    var stage = {
+      splitter: ctx.createChannelSplitter(2),
+      invert: ctx.createGain(),
+      merger: ctx.createChannelMerger(2),
+      wet: ctx.createGain(),
+      dry: ctx.createGain()
+    };
+    stage.invert.gain.value = -1;
+    srcNode.connect(stage.dry);
+    stage.dry.connect(destNode);
+    srcNode.connect(stage.splitter);
+    stage.splitter.connect(stage.merger, 0, 0);
+    stage.splitter.connect(stage.merger, 0, 1);
+    stage.splitter.connect(stage.invert, 1);
+    stage.invert.connect(stage.merger, 0, 0);
+    stage.invert.connect(stage.merger, 0, 1);
+    stage.merger.connect(stage.wet);
+    stage.wet.connect(destNode);
+    var enabled = ensureVocalRemovePreference();
+    stage.wet.gain.value = enabled ? 1 : 0;
+    stage.dry.gain.value = enabled ? 0 : 1;
+    return stage;
+  } catch (e) {
+    console.warn('vocal remove stage unavailable:', e && (e.message || e));
+    return null;
+  }
+}
+function applyVocalRemoveGains(ramp) {
+  if (!vocalRemoveStage || !vocalRemoveStage.wet || !vocalRemoveStage.dry) return;
+  var enabled = ensureVocalRemovePreference();
+  var wet = vocalRemoveStage.wet;
+  var dry = vocalRemoveStage.dry;
+  if (ramp && wet.gain.setTargetAtTime) {
+    var now = (wet.context && wet.context.currentTime) || 0;
+    wet.gain.setTargetAtTime(enabled ? 1 : 0, now, 0.015);
+    dry.gain.setTargetAtTime(enabled ? 0 : 1, now, 0.015);
+  } else {
+    wet.gain.value = enabled ? 1 : 0;
+    dry.gain.value = enabled ? 0 : 1;
+  }
+}
+function applyVocalRemoveUi() {
+  ensureVocalRemovePreference();
+  var btn = document.getElementById('t-vocalRemove');
+  if (btn) btn.classList.toggle('on', !!vocalRemoveEnabled);
+}
+function toggleVocalRemove() {
+  ensureVocalRemovePreference();
+  vocalRemoveEnabled = !vocalRemoveEnabled;
+  saveBooleanPreference(VOCAL_REMOVE_STORE_KEY, vocalRemoveEnabled);
+  applyVocalRemoveGains(true);
+  applyVocalRemoveUi();
+  showToast(vocalRemoveEnabled ? '人声消除已开启：中置人声相消，单声道音源无效果' : '人声消除已关闭');
+}
 function disconnectAudioGraphNodes(keepSource) {
-  [source, analyser, beatAnalyser, gainNode, analysisSinkNode].forEach(function (node) {
-    if (!node) return;
-    try { node.disconnect(); } catch (e) { }
-  });
+  var stage = vocalRemoveStage;
+  [source, analyser, beatAnalyser, gainNode, analysisSinkNode,
+    stage && stage.splitter, stage && stage.invert, stage && stage.merger, stage && stage.wet, stage && stage.dry].forEach(function (node) {
+      if (!node) return;
+      try { node.disconnect(); } catch (e) { }
+    });
   if (!keepSource) {
     source = null;
     audioSourceMedia = null;
@@ -15,6 +85,7 @@ function disconnectAudioGraphNodes(keepSource) {
   beatAnalyser = null;
   gainNode = null;
   analysisSinkNode = null;
+  vocalRemoveStage = null;
   audioReady = false;
 }
 function restoreMediaTimeWhenReady(media, seconds) {
@@ -98,6 +169,8 @@ function resetPlaybackAudioGraphForSourceSwitch(reason) {
     beatAnalyser = preparedGraph.beatAnalyser;
     gainNode = preparedGraph.gainNode;
     analysisSinkNode = null;
+    vocalRemoveStage = preparedGraph.vocalStage || null;
+    applyVocalRemoveGains(false);
     audioSourceMedia = audio;
     audio.__lantingMediaSourceBound = true;
     preparedGraph.adopted = true;
@@ -181,7 +254,8 @@ function initAudio() {
   analyser.smoothingTimeConstant = 0.58;
   beatAnalyser.fftSize = BEAT_FFT_SIZE;
   beatAnalyser.smoothingTimeConstant = 0.10;
-  source.connect(analyser);
+  vocalRemoveStage = buildVocalRemoveStage(audioCtx, source, analyser);
+  if (!vocalRemoveStage) source.connect(analyser);
   source.connect(beatAnalyser);
   if (gainNode) {
     analyser.connect(gainNode);

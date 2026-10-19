@@ -1968,6 +1968,43 @@ function checkSpotifyPreviewMatchQualityGuard() {
   console.log('[OK] Spotify 30s preview is the bounded last resort, and alternate matching scores album/duration with reason-specific failure copy.');
 }
 
+function checkInstrumentalSearchAndVocalRemoveGuard() {
+  logStep('Instrumental search and vocal removal guard');
+  const indexText = fs.readFileSync(path.join(appRoot, 'public', 'index.html'), 'utf8');
+  const searchText = fs.readFileSync(path.join(appRoot, 'public', 'js', 'modules', '05-playback', '07-search.js'), 'utf8');
+  const graphText = fs.readFileSync(path.join(appRoot, 'public', 'js', 'modules', '05-playback', '08-audio-graph-controls.js'), 'utf8');
+  const cuefieldText = fs.readFileSync(path.join(appRoot, 'public', 'js', 'modules', '05-playback', '18-cuefield-automix-integration.js'), 'utf8');
+  const storeText = fs.readFileSync(path.join(appRoot, 'public', 'js', 'modules', '00-state', '00-core-stores.js'), 'utf8');
+
+  if (!/search-instrumental-toggle/.test(indexText) || !/toggleInstrumentalSearchMode\(\)/.test(indexText)) {
+    fail('instrumental search must expose a visible toggle beside the search mode tabs');
+  }
+  if (!/INSTRUMENTAL_SEARCH_STORE_KEY/.test(searchText)
+    || !/searchProviderUrl\(provider, instrumentalSearchQuery\(q\)/.test(searchText)
+    || !/filterInstrumentalSearchSongs\(/.test(searchText)) {
+    fail('instrumental mode must inject its keyword at the single search fetch choke point and filter merged results');
+  }
+  if (!/t-vocalRemove/.test(indexText) || !/onclick="toggleVocalRemove\(\)"/.test(indexText)) {
+    fail('vocal removal must expose a visible FX toggle in the output section');
+  }
+  if (!/VOCAL_REMOVE_STORE_KEY/.test(storeText)) {
+    fail('vocal removal preference must persist across restarts');
+  }
+  if (!/function buildVocalRemoveStage\(/.test(graphText)
+    || !/createChannelSplitter\(2\)/.test(graphText)
+    || !/invert\.gain\.value = -1/.test(graphText)
+    || !/function toggleVocalRemove\(/.test(graphText)) {
+    fail('vocal removal must stay a dry/wet L-R center-cancel stage with a persisted toggle');
+  }
+  if (!/vocalRemoveStage = preparedGraph\.vocalStage/.test(graphText)) {
+    fail('prepared graph adoption must carry the vocal removal stage across source switches');
+  }
+  if (!/graph\.vocalStage = buildVocalRemoveStage\(audioCtx, graph\.source, graph\.filterNode\)/.test(cuefieldText)) {
+    fail('prepared audio graph must build the vocal removal stage before the EQ chain');
+  }
+  console.log('[OK] 伴奏模式 injects and filters at the search choke point; 人声消除 is a persisted dry/wet L-R stage wired into both graph builders with teardown.');
+}
+
 function checkPlaybackControlBadgesGuard() {
   logStep('Playback control source/VIP badge guard');
   const indexText = fs.readFileSync(path.join(appRoot, 'public', 'index.html'), 'utf8');
@@ -5673,6 +5710,7 @@ async function main() {
   checkQishuiProviderGuard();
   await checkSpotifyProviderGuard();
   checkSpotifyPreviewMatchQualityGuard();
+  checkInstrumentalSearchAndVocalRemoveGuard();
   checkPlaybackControlBadgesGuard();
   await checkProviderFallbackTerminalStateGuard();
   checkSearchGlassEntranceGuard();

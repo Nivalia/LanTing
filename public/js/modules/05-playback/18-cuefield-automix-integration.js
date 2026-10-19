@@ -407,7 +407,7 @@ function cuefieldCreatePreparedAudioGraph(media) {
     graph = {
       context: audioCtx, source: null, filterNode: null, bassNode: null, midNode: null, highNode: null,
       analyser: null, beatAnalyser: null, gainNode: null, echoSendNode: null,
-      echoDelayNode: null, echoFeedbackNode: null, echoWetNode: null, adopted: false
+      echoDelayNode: null, echoFeedbackNode: null, echoWetNode: null, vocalStage: null, adopted: false
     };
     graph.source = audioCtx.createMediaElementSource(media);
     // A media element cannot be safely returned to direct-output mode after a
@@ -447,7 +447,8 @@ function cuefieldCreatePreparedAudioGraph(media) {
     graph.beatAnalyser.fftSize = typeof BEAT_FFT_SIZE !== 'undefined' ? BEAT_FFT_SIZE : 1024;
     graph.beatAnalyser.smoothingTimeConstant = 0.10;
     graph.gainNode.gain.value = 0;
-    graph.source.connect(graph.filterNode);
+    graph.vocalStage = buildVocalRemoveStage(audioCtx, graph.source, graph.filterNode);
+    if (!graph.vocalStage) graph.source.connect(graph.filterNode);
     graph.filterNode.connect(graph.bassNode);
     graph.bassNode.connect(graph.midNode);
     graph.midNode.connect(graph.highNode);
@@ -470,6 +471,11 @@ function cuefieldCreatePreparedAudioGraph(media) {
       [graph.source, graph.filterNode, graph.bassNode, graph.midNode, graph.highNode,
         graph.analyser, graph.beatAnalyser, graph.gainNode, graph.echoSendNode,
         graph.echoDelayNode, graph.echoFeedbackNode, graph.echoWetNode].forEach(function (node) {
+        try { if (node) node.disconnect(); } catch (_) { }
+      });
+      var failedStage = graph.vocalStage;
+      [failedStage && failedStage.splitter, failedStage && failedStage.invert, failedStage && failedStage.merger,
+        failedStage && failedStage.wet, failedStage && failedStage.dry].forEach(function (node) {
         try { if (node) node.disconnect(); } catch (_) { }
       });
     }

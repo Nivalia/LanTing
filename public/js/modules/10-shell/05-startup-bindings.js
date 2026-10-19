@@ -44,6 +44,8 @@ startQQLoginStatusAutoRefresh();
 startKugouLoginStatusAutoRefresh();
 startQishuiLoginStatusAutoRefresh();
 startSpotifyLoginStatusAutoRefresh();
+if (typeof updateInstrumentalSearchToggle === 'function') updateInstrumentalSearchToggle();
+if (typeof applyVocalRemoveUi === 'function') applyVocalRemoveUi();
 if (typeof setupFullscreenDiyLayoutTracking === 'function') setupFullscreenDiyLayoutTracking();
 if (startupLoginStatusPromise && startupLoginStatusPromise.then) {
   startupLoginStatusPromise.then(function () {

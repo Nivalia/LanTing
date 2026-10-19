@@ -160,6 +160,40 @@ function runSearchHistory(q) {
   doSearch(q);
   $input.focus();
 }
+var INSTRUMENTAL_SEARCH_STORE_KEY = 'lanting-instrumental-search-v1';
+var instrumentalSearchMode = (function () {
+  try { return localStorage.getItem(INSTRUMENTAL_SEARCH_STORE_KEY) === '1'; } catch (e) { return false; }
+})();
+function instrumentalSearchQuery(q) {
+  var raw = String(q || '').trim();
+  if (!raw || !instrumentalSearchMode) return raw;
+  if (/伴奏|instrumental|纯音乐/i.test(raw)) return raw;
+  return raw + (/[\u4e00-\u9fa5]/.test(raw) ? ' 伴奏' : ' instrumental');
+}
+function songLooksLikeInstrumental(song) {
+  var text = String((song && song.name) || (song && song.title) || '') + ' ' + String((song && song.album) || '');
+  return /伴奏|instrumental|karaoke|k歌|纯音乐/i.test(text);
+}
+function filterInstrumentalSearchSongs(songs) {
+  if (!instrumentalSearchMode || !Array.isArray(songs) || !songs.length) return songs;
+  var instrumental = songs.filter(songLooksLikeInstrumental);
+  return instrumental.length ? instrumental : songs;
+}
+function updateInstrumentalSearchToggle() {
+  var btn = document.getElementById('search-instrumental-toggle');
+  if (!btn) return;
+  btn.classList.toggle('active', !!instrumentalSearchMode);
+  btn.setAttribute('aria-pressed', instrumentalSearchMode ? 'true' : 'false');
+  btn.style.display = searchMode === 'podcast' ? 'none' : '';
+}
+function toggleInstrumentalSearchMode() {
+  instrumentalSearchMode = !instrumentalSearchMode;
+  try { localStorage.setItem(INSTRUMENTAL_SEARCH_STORE_KEY, instrumentalSearchMode ? '1' : '0'); } catch (e) { }
+  updateInstrumentalSearchToggle();
+  showToast(instrumentalSearchMode ? '伴奏模式已开启：搜索词自动追加「伴奏 / instrumental」' : '伴奏模式已关闭');
+  var current = $input && $input.value ? $input.value.trim() : '';
+  if (current && searchMode !== 'podcast') doSearch(current);
+}
 function updateSearchModeTabs() {
   var songBtn = document.getElementById('search-mode-song');
   var neteaseBtn = document.getElementById('search-mode-netease');
@@ -203,6 +237,7 @@ function updateSearchModeTabs() {
   }
   if ($input && searchMode === 'qishui') $input.placeholder = '搜索汽水音乐匹配源...';
   if ($input && searchMode === 'spotify') $input.placeholder = '搜索 Spotify 匹配源...';
+  updateInstrumentalSearchToggle();
   requestAnimationFrame(updateSearchPillGlassDisplacementMap);
 }
 function setSearchMode(mode) {
@@ -1085,7 +1120,7 @@ async function fetchMusicSearchResults(q, mode, previousPages) {
     var previous = previousPages && previousPages[provider];
     var offset = previous ? Math.max(0, Number(previous.nextOffset) || 0) : 0;
     var limit = pageLimitByProvider[provider] || 12;
-    return apiJson(searchProviderUrl(provider, q, limit, offset)).then(function (value) {
+    return apiJson(searchProviderUrl(provider, instrumentalSearchQuery(q), limit, offset)).then(function (value) {
       return { provider: provider, offset: offset, requestedLimit: limit, value: value || {} };
     });
   }));
@@ -1118,7 +1153,7 @@ async function fetchMusicSearchResults(q, mode, previousPages) {
     songsByProvider[provider] = songs;
     if (value.message && !songs.length && !searchProviderNotice) searchProviderNotice = value.message;
   });
-  var songs = mergeSongSearchResults(
+  var songs = filterInstrumentalSearchSongs(mergeSongSearchResults(
     songsByProvider.netease,
     songsByProvider.qq,
     songsByProvider.kugou,
@@ -1126,7 +1161,7 @@ async function fetchMusicSearchResults(q, mode, previousPages) {
     songsByProvider.spotify,
     MUSIC_SEARCH_MAX_RESULTS,
     q
-  );
+  ));
   return { songs: songs, providerPages: providerPages, hasMore: searchProviderPagesHaveMore(providerPages) };
 }
 function searchSongResultHtml(s, i) {
