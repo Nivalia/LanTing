@@ -4864,6 +4864,19 @@ ipcMain.handle('qishui-music-clear-login', async () => {
   return clearQishuiMusicLoginSession();
 });
 
+ipcMain.handle('spotify-music-open-login', async (event) => {
+  if (!loginEasterEggGate.isUnlocked()) return loginEasterEggLockedResult();
+  return openSpotifyMusicLoginWindow(getSenderWindow(event));
+});
+
+ipcMain.handle('spotify-music-verify-setup', async () => {
+  return verifySpotifyOAuthCallbackEndpoint();
+});
+
+ipcMain.handle('spotify-music-clear-login', async () => {
+  return clearSpotifyMusicLoginSession();
+});
+
 ipcMain.handle('lanting-open-update-page', async (event, value) => {
   try {
     if (!isTrustedMainWindowIpc(event)) return { ok: false, error: 'UNTRUSTED_SENDER' };

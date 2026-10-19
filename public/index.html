@@ -115,6 +115,7 @@
           <button id="search-mode-qq" type="button" onclick="setSearchMode('qq')" aria-selected="false">QQ</button>
           <button id="search-mode-kugou" type="button" onclick="setSearchMode('kugou')" aria-selected="false">KG</button>
           <button id="search-mode-qishui" type="button" onclick="setSearchMode('qishui')" aria-selected="false">QS</button>
+          <button id="search-mode-spotify" type="button" onclick="setSearchMode('spotify')" aria-selected="false">SP</button>
           <button id="search-mode-podcast" type="button" onclick="setSearchMode('podcast')"
             aria-selected="false">Podcast</button>
         </div>
@@ -294,6 +295,7 @@
           <button type="button" role="tab" data-home-recommend-source="qishui" aria-selected="false">汽水</button>
           <button type="button" role="tab" data-home-recommend-source="qq" aria-selected="false">QQ</button>
           <button type="button" role="tab" data-home-recommend-source="kugou" aria-selected="false">酷狗</button>
+          <button type="button" role="tab" data-home-recommend-source="spotify" aria-selected="false">Spotify</button>
         </div>
         <div id="home-platform-recommend-status" class="home-platform-recommend-status" role="status"
           aria-live="polite"></div>
@@ -1525,6 +1527,8 @@
                 class="provider-logo">KG</span><b>酷狗音乐</b><small>官方窗口 / Cookie</small><span class="flow-port out" data-login-provider-output="kugou" title="拖到 LT 接入口"></span></button>
             <button id="login-provider-qishui" class="qishui workflow-node" type="button" data-login-provider="qishui" onclick="selectLoginProviderNode('qishui')"><span
                 class="provider-logo">QS</span><b>汽水音乐</b><small>官方扫码 / 抖音确认</small><span class="flow-port out" data-login-provider-output="qishui" title="拖到 LT 接入口"></span></button>
+            <button id="login-provider-spotify" class="spotify workflow-node" type="button" data-login-provider="spotify"
+              onclick="selectLoginProviderNode('spotify')"><span class="provider-logo">SP</span><b>Spotify</b><small>系统浏览器 / OAuth</small><span class="flow-port out" data-login-provider-output="spotify" title="拖到 LT 接入口"></span></button>
           </div>
           <div class="login-node-hub workflow-node" data-login-node="lt">
             <span class="flow-port in" data-login-lt-target="lt" title="LT 接入口"></span>
@@ -1565,6 +1569,81 @@
             <button id="qq-cookie-toggle-btn" class="modal-btn" type="button"
               onclick="toggleQQCookiePanel()">手动导入</button>
             <button id="refresh-qr-btn" class="modal-btn primary" onclick="startSelectedLoginConnection()">开始登录</button>
+          </div>
+          <div id="spotify-setup-wizard" class="spotify-setup-wizard" aria-hidden="true">
+            <div class="spotify-setup-head">
+              <div>
+                <span>SPOTIFY OAUTH · PKCE</span>
+                <b>连接 Spotify · 四步向导</b>
+              </div>
+              <small>Client ID 只保存在本机，PKCE 流程无需 Client Secret</small>
+            </div>
+            <div class="spotify-setup-progress">
+              <span data-spotify-progress="1"><i>1</i>保存 Client ID</span>
+              <span data-spotify-progress="2"><i>2</i>检测回调</span>
+              <span data-spotify-progress="3"><i>3</i>浏览器授权</span>
+              <span data-spotify-progress="4"><i>4</i>接口体检</span>
+            </div>
+            <div class="spotify-setup-steps">
+              <div id="spotify-setup-step-1" class="spotify-setup-card" data-step="1">
+                <span class="spotify-setup-card-number">01</span>
+                <div class="spotify-setup-card-copy">
+                  <b>创建应用并粘贴 Client ID</b>
+                  <p>在 <strong>Spotify Developer Dashboard</strong> 创建 App，类型任意；随后复制 <strong>Client ID</strong> 粘贴到下方保存。</p>
+                  <label for="spotify-setup-client-id">Client ID</label>
+                  <input id="spotify-setup-client-id" type="text" spellcheck="false" autocomplete="off"
+                    placeholder="粘贴 Spotify Client ID">
+                  <div class="spotify-setup-card-actions">
+                    <button type="button" id="spotify-setup-save-client" class="primary"
+                      onclick="saveSpotifySetupClientId()">保存 Client ID</button>
+                    <button type="button" class="spotify-guide-link" onclick="openSpotifyDeveloperDashboard()">打开
+                      Dashboard</button>
+                  </div>
+                </div>
+                <span class="spotify-setup-card-state" data-spotify-step-state="1">进行中</span>
+              </div>
+              <div id="spotify-setup-step-2" class="spotify-setup-card" data-step="2">
+                <span class="spotify-setup-card-number">02</span>
+                <div class="spotify-setup-card-copy">
+                  <b>登记回调地址</b>
+                  <p>把下方地址完整添加到 App 的 <strong>Redirect URIs</strong>，保存后点击「检测回调」。</p>
+                  <code id="spotify-setup-redirect-uri">http://127.0.0.1:43879/callback</code>
+                  <div class="spotify-setup-card-actions">
+                    <button type="button" id="spotify-setup-check-callback"
+                      onclick="verifySpotifySetupCallback()">检测回调</button>
+                    <button type="button" class="spotify-guide-link" onclick="copySpotifyRedirectUri()">复制回调</button>
+                  </div>
+                </div>
+                <span class="spotify-setup-card-state" data-spotify-step-state="2">等待上一步</span>
+              </div>
+              <div id="spotify-setup-step-3" class="spotify-setup-card" data-step="3">
+                <span class="spotify-setup-card-number">03</span>
+                <div class="spotify-setup-card-copy">
+                  <b>系统浏览器授权</b>
+                  <p>打开默认浏览器完成 Spotify 登录授权；授权成功后自动回传本机回调（3 分钟内有效），全程 PKCE
+                    授权，不接触 Client Secret，也不保存你的 Spotify 密码。</p>
+                  <div class="spotify-setup-card-actions">
+                    <button type="button" id="spotify-setup-authorize" class="primary wide"
+                      onclick="openSpotifyWebLogin()">打开浏览器并授权</button>
+                  </div>
+                </div>
+                <span class="spotify-setup-card-state" data-spotify-step-state="3">等待上一步</span>
+              </div>
+              <div id="spotify-setup-step-4" class="spotify-setup-card" data-step="4">
+                <span class="spotify-setup-card-number">04</span>
+                <div class="spotify-setup-card-copy">
+                  <b>接口体检</b>
+                  <p>验证账号资料、权限、Liked Songs 与个人歌单是否全部接通。</p>
+                  <div id="spotify-setup-check-list" class="spotify-setup-check-list"><span class="spotify-setup-check">等待账号授权</span><span class="spotify-setup-check">等待权限检测</span></div>
+                  <div class="spotify-setup-card-actions">
+                    <button type="button" id="spotify-setup-diagnose"
+                      onclick="runSpotifySetupDiagnostics(false)">运行体检</button>
+                  </div>
+                </div>
+                <span class="spotify-setup-card-state" data-spotify-step-state="4">等待上一步</span>
+              </div>
+            </div>
+            <div id="spotify-setup-overall" class="spotify-setup-overall">按当前步骤继续，澜听会自动检测。</div>
           </div>
         </div>
       </div>
@@ -1630,6 +1709,7 @@
           <button id="user-provider-qq" class="qq" type="button" onclick="setActiveAccountProvider('qq')">QQ 音乐</button>
           <button id="user-provider-kugou" class="kugou" type="button" onclick="setActiveAccountProvider('kugou')">酷狗音乐</button>
           <button id="user-provider-qishui" class="qishui" type="button" onclick="setActiveAccountProvider('qishui')">汽水音乐</button>
+          <button id="user-provider-spotify" class="spotify" type="button" onclick="setActiveAccountProvider('spotify')">Spotify</button>
           <button id="user-provider-both" class="both" type="button" onclick="enableDualAccountView()">我两个都要</button>
         </div>
         <div class="account-modal-actions">
@@ -1637,6 +1717,7 @@
           <button id="account-add-qq" class="modal-btn" onclick="openProviderLogin('qq')">补登 QQ 音乐</button>
           <button id="account-add-kugou" class="modal-btn" onclick="openProviderLogin('kugou')">补登酷狗音乐</button>
           <button id="account-add-qishui" class="modal-btn" onclick="openProviderLogin('qishui')">登录汽水音乐</button>
+          <button id="account-add-spotify" class="modal-btn" onclick="openProviderLogin('spotify')">连接 Spotify</button>
         </div>
         <div id="account-hint" class="account-hint">QQ 音乐真实登录暂未接入，当前先预览双平台账号交互。</div>
         <div class="btn-row">

@@ -4637,11 +4637,6 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost:' + PORT);
   const pn = url.pathname;
 
-  if (pn === '/api/spotify' || pn.indexOf('/api/spotify/') === 0) {
-    sendJSON(res, { ok: false, error: 'PROVIDER_REMOVED', message: '该平台接口已从澜听移除。' }, 404);
-    return;
-  }
-
   if (LOGIN_EASTER_EGG_PROTECTED_ROUTES.has(pn) && !loginEasterEggGateUnlocked()) {
     sendJSON(res, {
       ok: false,

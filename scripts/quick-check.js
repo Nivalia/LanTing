@@ -316,9 +316,9 @@ function runSpotifyApiResilienceRegressionCheck() {
   process.stdout.write(result.stdout || '');
 }
 
-function runProviderRemovalDiyCinemaRegressionCheck() {
-  logStep('Provider removal, fullscreen DIY, and cinematic preload regression');
-  const testFile = path.join(appRoot, 'tests', 'provider-removal-diy-cinema-preload.test.js');
+function runProviderSurfaceDiyCinemaRegressionCheck() {
+  logStep('Provider surface, fullscreen DIY, and cinematic preload regression');
+  const testFile = path.join(appRoot, 'tests', 'provider-surface-diy-cinema-preload.test.js');
   const result = spawnSync(process.execPath, ['--test', testFile], {
     cwd: appRoot,
     encoding: 'utf8'
@@ -326,7 +326,7 @@ function runProviderRemovalDiyCinemaRegressionCheck() {
   if (result.status !== 0) {
     process.stdout.write(result.stdout || '');
     process.stderr.write(result.stderr || '');
-    fail(`provider removal/DIY/cinematic regression failed: ${rel(testFile)}`);
+    fail(`provider surface/DIY/cinematic regression failed: ${rel(testFile)}`);
   }
   process.stdout.write(result.stdout || '');
 }
@@ -1931,33 +1931,6 @@ async function checkSpotifyProviderGuard() {
     fail('Spotify local credential files must stay ignored by git');
   }
   console.log('[OK] Spotify Web API match source is guarded across backend, UI, playback fallback, lyrics, and packaging.');
-}
-
-function checkSpotifyRemovalGuard() {
-  logStep('Removed provider surface guard');
-  const indexText = fs.readFileSync(path.join(appRoot, 'public', 'index.html'), 'utf8');
-  const searchText = fs.readFileSync(path.join(appRoot, 'public', 'js', 'modules', '05-playback', '07-search.js'), 'utf8');
-  const accountText = fs.readFileSync(path.join(appRoot, 'public', 'js', 'modules', '08-account', '01-login-modal-utils.js'), 'utf8');
-  const startupText = fs.readFileSync(path.join(appRoot, 'public', 'js', 'modules', '10-shell', '05-startup-bindings.js'), 'utf8');
-  const serverText = fs.readFileSync(path.join(appRoot, 'server.js'), 'utf8');
-  const mainText = fs.readFileSync(path.join(appRoot, 'desktop', 'main.js'), 'utf8');
-  const preloadText = fs.readFileSync(path.join(appRoot, 'desktop', 'preload.js'), 'utf8');
-  if (/search-mode-spotify|login-provider-spotify|user-provider-spotify|account-add-spotify|spotify-setup-wizard/.test(indexText)) {
-    fail('removed provider must not expose search, login, account, or setup UI');
-  }
-  if (/MUSIC_SEARCH_PROVIDER_ORDER\s*=\s*\[[^\]]*spotify/.test(searchText) || /ACCOUNT_PROVIDER_KEYS\s*=\s*\[[^\]]*spotify/.test(accountText)) {
-    fail('removed provider must not participate in search or account capsule ordering');
-  }
-  if (/refreshSpotifyLoginStatus\(\)|startSpotifyLoginStatusAutoRefresh\(\)/.test(startupText)) {
-    fail('startup must not request removed provider status');
-  }
-  if (!/PROVIDER_REMOVED/.test(serverText) || !/pn\.indexOf\('\/api\/spotify\/'\) === 0/.test(serverText)) {
-    fail('removed provider HTTP routes must terminate with an explicit 404 guard');
-  }
-  if (/spotify-music-(?:open-login|verify-setup|clear-login)/.test(mainText + '\n' + preloadText)) {
-    fail('desktop bridge must not expose removed provider login IPC');
-  }
-  console.log('[OK] Removed provider has no searchable, login, account-capsule, startup, HTTP, or desktop IPC surface.');
 }
 
 function checkPlaybackControlBadgesGuard() {
@@ -5642,7 +5615,7 @@ async function main() {
   runQQVipEntitlementRegressionCheck();
   runLoginEasterEggGateRegressionCheck();
   runQishuiProviderDistributionRegressionCheck();
-  runProviderRemovalDiyCinemaRegressionCheck();
+  runProviderSurfaceDiyCinemaRegressionCheck();
   runVisualPerformanceControlsRegressionCheck();
   runPlatformAccountSyncGuardCheck();
   runHomeDailyRecommendationRegressionCheck();
@@ -5663,7 +5636,7 @@ async function main() {
   checkLyricTranslationCompletenessGuard();
   checkLyricVerticalFloatToggleGuard();
   checkQishuiProviderGuard();
-  checkSpotifyRemovalGuard();
+  await checkSpotifyProviderGuard();
   checkPlaybackControlBadgesGuard();
   await checkProviderFallbackTerminalStateGuard();
   checkSearchGlassEntranceGuard();

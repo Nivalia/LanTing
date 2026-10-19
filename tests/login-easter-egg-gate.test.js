@@ -199,7 +199,7 @@ async function run() {
 
     const logoutRenderer = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'modules', '08-account', '04-user-modal-logout.js'), 'utf8');
     assert(logoutRenderer.includes('function logoutAllAccountsAndResetEasterEgg()'));
-    assert(!logoutRenderer.includes("apiJson('/api/spotify/logout')"));
+    assert(logoutRenderer.includes("apiJson('/api/spotify/logout')"));
     assert(logoutRenderer.includes('resetAllProviderRendererLoginState()'));
     assert(logoutRenderer.includes('resetLoginEasterEggUiForReplay()'));
     assert(logoutRenderer.includes('armLogoutAllAccountsResetConfirmation()'));

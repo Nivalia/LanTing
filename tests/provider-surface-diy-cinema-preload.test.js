@@ -6,7 +6,7 @@ const path = require('node:path');
 const ROOT = path.join(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(ROOT, ...parts), 'utf8');
 
-test('removed provider has no user-facing or callable login surface', () => {
+test('Spotify provider has a complete user-facing and callable login surface', () => {
   const index = read('public', 'index.html');
   const search = read('public', 'js', 'modules', '05-playback', '07-search.js');
   const accounts = read('public', 'js', 'modules', '08-account', '01-login-modal-utils.js');
@@ -15,13 +15,23 @@ test('removed provider has no user-facing or callable login surface', () => {
   const preload = read('desktop', 'preload.js');
   const server = read('server.js');
 
-  assert.doesNotMatch(index, /search-mode-spotify|login-provider-spotify|user-provider-spotify|account-add-spotify|spotify-setup-wizard/);
-  assert.doesNotMatch(search, /MUSIC_SEARCH_PROVIDER_ORDER\s*=\s*\[[^\]]*spotify/);
-  assert.doesNotMatch(accounts, /ACCOUNT_PROVIDER_KEYS\s*=\s*\[[^\]]*spotify/);
-  assert.doesNotMatch(startup, /refreshSpotifyLoginStatus\(\)|startSpotifyLoginStatusAutoRefresh\(\)/);
-  assert.doesNotMatch(main + preload, /spotify-music-(?:open-login|verify-setup|clear-login)/);
-  assert.match(server, /PROVIDER_REMOVED/);
-  assert.match(server, /pn\.indexOf\('\/api\/spotify\/'\) === 0/);
+  assert.match(index, /search-mode-spotify/);
+  assert.match(index, /login-provider-spotify/);
+  assert.match(index, /user-provider-spotify/);
+  assert.match(index, /account-add-spotify/);
+  assert.match(index, /spotify-setup-wizard/);
+  assert.match(index, /spotify-setup-step-1/);
+  assert.match(index, /spotify-setup-step-4/);
+  assert.match(search, /MUSIC_SEARCH_PROVIDER_ORDER\s*=\s*\[[^\]]*spotify/);
+  assert.match(accounts, /ACCOUNT_PROVIDER_KEYS\s*=\s*\[[^\]]*spotify/);
+  assert.match(startup, /refreshSpotifyLoginStatus\(\)/);
+  assert.match(startup, /startSpotifyLoginStatusAutoRefresh\(\)/);
+  assert.match(main, /spotify-music-open-login/);
+  assert.match(main, /spotify-music-verify-setup/);
+  assert.match(preload, /spotify-music-open-login/);
+  assert.match(preload, /spotify-music-verify-setup/);
+  assert.match(preload, /spotify-music-clear-login/);
+  assert.doesNotMatch(server, /PROVIDER_REMOVED/);
 });
 
 test('fullscreen DIY control follows the bottom-most visible account pill', () => {
