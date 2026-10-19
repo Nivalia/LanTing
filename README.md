@@ -1,98 +1,85 @@
 # 澜听 LanTing
 
-> **项目状态：长期停更**
->
-> 目前因个人原因，澜听项目处于长期停更状态。感兴趣的个人玩家可随意使用本项目进行创作，也可以自行修改和修复 bug。希望各位玩得开心，也希望世界和平，享受我们的音乐。
->
-> 本仓库保留公开源码、历史版本和下载说明，方便个人玩家 Fork、建立分支或制作二创版本。
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](./LICENSE)
+[![Release](https://img.shields.io/github/v/release/Nivalia/LanTing?include_prereleased&label=Release)](https://github.com/Nivalia/LanTing/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey.svg)](https://github.com/Nivalia/LanTing/releases)
+[![Electron](https://img.shields.io/badge/Electron-42-47848F.svg)](https://www.electronjs.org/)
+
+> **LanTing**，取「澜」之水波与「听」之聆听：像看一片有声的水面。
 
 ![澜听暗场启动页](./docs/assets/readme/cinema-beat-smoke.png)
 
 澜听是一款 Windows 桌面沉浸式音乐播放器，把搜索播放、歌词舞台、粒子视觉、3D 歌单架和完整桌面模式组合成一个更接近现场感的私人音乐空间。
 
-## 立即下载 Windows 安装包
+## 立即下载
 
-> 本次下载入口已更换，请使用下面的新网盘链接，并更新旧收藏。通过公告中的网盘入口下载，可以继续使用现有版本；项目目前处于长期停更状态。
+前往 [Releases](https://github.com/Nivalia/LanTing/releases) 下载最新安装包：
 
-| 下载入口 | 推荐人群 | 链接 |
-| --- | --- | --- |
-| 夸克盘 | 夸克用户 | [下载澜听 2.2.0](https://pan.quark.cn/s/4b124d3e81d3) |
-| 百度云 | 百度网盘用户（提取码 `SJHP`） | [下载澜听 2.2.0](https://pan.baidu.com/s/17CwpHUza67w_Grgc3s5nOw?pwd=SJHP) |
-| GitHub Release | 版本说明与源码 | [查看澜听 2.2.0](https://github.com/Nivalia/LanTing/releases/tag/v2.2.0) |
+```
+LanTing-<version>-Setup.exe
+```
 
-本页、发布公告和软件更新入口使用相同的两条新链接。旧分享地址不再作为本次版本的下载入口。
+运行安装包即可完成安装，安装程序会创建桌面快捷方式。`.blockmap`、`latest.yml`、`win-unpacked` 是更新与构建产物，不是安装包。
 
-安装时只需要下载并运行 `LanTing-2.2.0-Setup.exe`。不要把 `.blockmap`、`latest.yml` 或 `win-unpacked` 当成正式安装包。
-
-2.1.0 用户如果未看到更新提醒，请从托盘彻底退出后重新打开软件，切回普通窗口，等待约 30 秒后查看右上角更新箭头。旧版不会自动弹出公告；也可以直接使用上面的新网盘链接下载安装包。
-
-## 下载或安装被拦截怎么办
-
-小众 Electron 桌面软件、未签名安装包有时会被浏览器、Windows Defender 或 SmartScreen 提示风险。请先确认安装包来自本次公告的下载入口，文件名是 `LanTing-2.2.0-Setup.exe`。
-
-1. 浏览器下载栏提示风险时，打开下载列表，点这条下载右侧的 `...` 三个点，选择 `保留` / `仍要保留` / `显示更多` 后继续保留。
-2. Windows SmartScreen 弹出蓝色拦截窗口时，点 `更多信息`，再点 `仍要运行`。
-3. 如果杀毒软件明确显示木马、高危或已经隔离，不要强行运行；删除该文件后重新从上面的网盘入口下载，仍然异常请带截图反馈给作者。
-
-## 作者支持
-
-如果澜听陪你多听了一首歌，也欢迎请作者一杯咖啡。
-
-[查看完整支持页](./docs/SUPPORT.md)
-
-![澜听作者支持渠道](./docs/assets/support/lanting-author-support-poster.png)
-
-LanTing 2.2 是历史稳定版本，修复了音乐接口的登录与播放问题，改善歌单加载和网络异常恢复，并加入更多手势操作与粒子预设。
-
-## 当前版本
-
-当前版本：`2.2.0`
-
-状态：澜听 2.2.0 历史正式版；项目目前长期停更。
-
-> 安全提示：`v1.0.10` 及更早旧安装包不再建议继续安装或传播。请使用本次公告提供的 `LanTing-2.2.0-Setup.exe`。
+> **安全提示**：`v1.0.10` 及更早的旧安装包不再建议安装或传播，请只使用本仓库 Release 中的安装包。详见 [SECURITY.md](./SECURITY.md)。
 
 ## 核心特性
 
-- 首页包含每日推荐、平台推荐、继续听、听歌画像和我的歌单入口
-- 完整桌面模式保留播放器、主页、歌单和桌面交互
-- 支持本地 MP4 与 Wallpaper Engine 视觉内容
-- 播放后切换到 Emily / 默认播放态视觉，歌词舞台与粒子舞台同步工作
-- 基于节奏的电影镜头视觉系统
-- 面向长播客和 DJ 曲目的专属视觉模式
-- 歌词舞台、自定义歌词、歌词位置与视觉控制
-- 自定义专辑封面上传与裁剪
-- 右键唤起 3D 歌单架，支持歌单队列浏览
-- 网易云音乐账号、搜索、歌单、播客等体验接入
-- QQ 音乐搜索、登录态与音源补充接入
-- GitHub Releases 更新检测与下载入口
-- 首次启动内置「默认测试」视觉用户存档，软件内默认视觉参数与该存档一致
-
-## 使用说明
-
-Windows 用户可以从本次发布公告列出的新网盘入口下载安装包。
-
-正式分发以 `LanTing-2.2.0-Setup.exe` 为准，不建议直接使用 `win-unpacked` 目录。安装包会创建桌面快捷方式。
-
-已经安装过旧版本的用户可直接运行 `LanTing-2.2.0-Setup.exe` 完成更新。软件内更新入口只会打开浏览器下载页，不会在客户端内下载或应用补丁。
+- **首页仪表盘**：每日推荐、平台推荐、继续听、听歌画像、我的歌单入口
+- **完整桌面模式**：播放器、主页、歌单直接铺在桌面上，保留窗口交互与图标层
+- **歌词舞台**：多行歌词、翻译、位置与深度控制，桌面歌词独立窗口
+- **粒子与节奏视觉**：基于节奏的电影镜头系统，粒子预设随播放状态联动
+- **本地视觉内容**：支持本地 MP4 与 Wallpaper Engine 壁纸导入为视觉层
+- **3D 歌单架**：右键唤起，浏览歌单队列与封面卡片
+- **多平台音源**：网易云音乐、QQ 音乐、酷狗、汽水音乐的搜索、登录与播放辅助
+- **播客与长曲目**：面向长播客和 DJ 曲目的专属视觉模式
+- **自定义外观**：专辑封面上传裁剪、自定义歌词、DIY 玩家模式
+- **Cuefield AutoMix**：可选启用的自动混音规划与过渡运行时（详见 [NOTICE.md](./NOTICE.md)）
 
 ## 开发运行
 
 ```bash
 npm install
-npm start
+npm start          # 以 Electron 启动桌面版
+```
+
+构建 Windows NSIS 安装包（产物位于 `dist/`）：
+
+```bash
 npm run build:win
 ```
 
-桌面版入口由 Electron 主进程加载本地服务。`npm run build:win` 会生成 Windows NSIS 安装包，产物位于 `dist/`。
+质量检查：
+
+```bash
+node scripts/quick-check.js        # 静态自检：语法、守卫测试、回归检查
+node scripts/quick-check.js --full # 附加 Electron 启动与运行时 QA
+node --test tests/                 # 完整测试套件
+```
+
+> 构建机无法访问 GitHub 时可使用镜像：`ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`。
+
+## 目录结构
+
+| 目录 / 文件 | 说明 |
+| --- | --- |
+| `desktop/` | Electron 主进程：窗口、托盘、IPC、分区、原生层守卫 |
+| `public/` | 渲染层：页面、样式、视觉与歌词运行时 |
+| `server.js` | 本地服务：数据聚合与更新检测 |
+| `*-api.js` | 各音乐平台的搜索 / 歌词 / 播放适配器 |
+| `cuefield/` | Cuefield AutoMix 规划器与桥接 |
+| `build/` | 图标、NSIS 脚本、打包钩子 |
+| `scripts/` | 自检与运维脚本 |
+| `tests/` | `node --test` 测试套件 |
+| `docs/` | 设计文档、发布说明、第三方移植记录 |
 
 ## 更新机制
 
-澜听会请求 GitHub Releases latest 检测新版本。远端版本高于本地版本时，应用内更新入口会展示 Release 内容，并通过系统浏览器打开可选网盘线路；即使 Release 附带完整安装包，`2.0.3+` 客户端也不会读取、下载、缓存或应用该附件与补丁。
+澜听会请求 GitHub Releases 的 latest 版本检测新版本，远端版本高于本地版本时在应用内展示更新内容。`2.0.3+` 客户端只读取 Release 正文中的下载线路，不会在客户端内下载或应用补丁。
 
-本地验证更新链路时，可以通过 `LANTING_UPDATE_MANIFEST` 指向一个本地 manifest JSON 或 HTTP 地址来模拟线上 Release。
+本地验证更新链路时，可通过 `LANTING_UPDATE_MANIFEST` 指向本地 manifest JSON 或 HTTP 地址模拟线上 Release。详见 [docs/UPDATE_DELIVERY.md](./docs/UPDATE_DELIVERY.md)。
 
-## 第三方音乐平台说明
+## 第三方平台说明
 
 澜听不是网易云音乐、QQ 音乐或腾讯音乐娱乐集团的官方客户端，也不隶属于任何音乐平台。
 
@@ -100,20 +87,30 @@ npm run build:win
 
 ## 用户数据与隐私
 
-登录 Cookie、搜索历史、自定义封面、自定义歌词、节奏分析缓存等数据只应保存在本机用户数据目录或浏览器本地存储中，不应提交到仓库。
+登录 Cookie、搜索历史、自定义封面、自定义歌词、节奏分析缓存等数据只保存在本机用户数据目录或浏览器本地存储中，`.gitignore` 已将这些文件全部排除在仓库之外。详见 [PRIVACY.md](./PRIVACY.md)。
 
-更多说明见 [PRIVACY.md](./PRIVACY.md)。
+## 文档
+
+| 文档 | 内容 |
+| --- | --- |
+| [SECURITY.md](./SECURITY.md) | 安全策略与安装包安全公告 |
+| [PRIVACY.md](./PRIVACY.md) | 隐私与用户数据说明 |
+| [NOTICE.md](./NOTICE.md) | 第三方依赖与移植声明（GPL 署名） |
+| [CHANGELOG.md](./CHANGELOG.md) | 版本变更记录 |
+| [RELEASE.md](./RELEASE.md) | 发布流程与验收清单 |
+| [docs/THIRD_PARTY_PORTS.md](./docs/THIRD_PARTY_PORTS.md) | 第三方移植细节 |
+| [docs/INSTALLER_STYLE.md](./docs/INSTALLER_STYLE.md) | 安装包视觉规范 |
 
 ## 致谢
 
-澜听由 XxHuberrr 主要设计与打造。emily 作为早期视觉底层想法与 `emily` 视觉预设改进方向的共创者和灵感来源之一，特此感谢。
-
-同时感谢小天才e宝、应春日、锋将军、軌跡、林中、骊、风痕、花椰菜🥦在早期体验、测试反馈和发布准备中的帮助。
+- 澜听最初由 **XxHuberrr** 设计与打造，本仓库在其公开源码基础上继续维护。
+- **emily** 作为早期视觉底层想法与 `emily` 视觉预设改进方向的共创者和灵感来源之一，特此感谢。
+- 感谢小天才e宝、应春日、锋将军、軌跡、林中、骊、风痕、花椰菜🥦在早期体验、测试反馈和发布准备中的帮助。
 
 ## 版权与授权
 
-Copyright (C) 2026 XxHuberrr.
+Copyright (C) 2026 澜听 LanTing 作者及贡献者。
 
-本项目采用 GPL-3.0 授权。详见 [LICENSE](./LICENSE)。
+本项目采用 **GPL-3.0** 授权，详见 [LICENSE](./LICENSE)。
 
-MR Logo、澜听名称、界面视觉设计与原创视觉表达归作者所有；第三方依赖和第三方服务分别遵循其各自授权与服务条款。
+澜听名称、界面视觉设计与原创视觉表达归作者所有；第三方依赖和第三方服务分别遵循其各自授权与服务条款，详见 [NOTICE.md](./NOTICE.md)。

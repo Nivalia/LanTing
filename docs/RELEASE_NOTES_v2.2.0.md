@@ -1,18 +1,13 @@
-- 本次下载入口已更换，请使用公告中的新网盘链接，并更新旧收藏。
+## LanTing 2.2.0
+
 - 修复音乐接口的登录、账号识别与播放稳定性问题。
 - 改善歌单加载、搜索分页，以及网络异常后的恢复。
 - 新增粒子预设与更多手势操作，改善日常播放体验。
 
 ## 下载
 
-通过本次公告中的网盘入口下载，也是在支持澜听的持续更新。感谢支持。
+安装包：`LanTing-2.2.0-Setup.exe`（见本 Release 的 Assets）。
 
-- [夸克盘下载澜听 2.2.0](https://pan.quark.cn/s/4b124d3e81d3)
-- [百度云下载澜听 2.2.0](https://pan.baidu.com/s/17CwpHUza67w_Grgc3s5nOw?pwd=SJHP)（提取码：`SJHP`）
+SHA-256：`e7d825a11f1c5186c2ee6879ecb9d93c32c15d097fd3481c89ec7032df8743f9`。
 
-完整安装包：`LanTing-2.2.0-Setup.exe`
-
-SHA-256：`8fd318283bab2fe98190f7b879ede423dd8274a0aeec8d321570b8d022d4f989`。
-
-<!-- lanting-download-page: 夸克盘|https://pan.quark.cn/s/4b124d3e81d3 -->
-<!-- lanting-download-page: 百度云|https://pan.baidu.com/s/17CwpHUza67w_Grgc3s5nOw?pwd=SJHP -->
+<!-- lanting-download-page: 直接下载|https://github.com/Nivalia/LanTing/releases/download/v2.2.0/LanTing-2.2.0-Setup.exe -->
