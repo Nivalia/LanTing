@@ -7,7 +7,7 @@
 
 > **LanTing**，取「澜」之水波与「听」之聆听：像看一片有声的水面。
 
-![澜听暗场启动页](./docs/assets/readme/cinema-beat-smoke.png)
+![澜听 LanTing 暗场启动页](./docs/assets/readme/splash-lanting.png)
 
 澜听是一款 Windows 桌面沉浸式音乐播放器，把搜索播放、歌词舞台、粒子视觉、3D 歌单架和完整桌面模式组合成一个更接近现场感的私人音乐空间。
 
