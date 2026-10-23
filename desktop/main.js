@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, screen, session, globalShortcut, dialog, Tray, Menu, protocol, desktopCapturer, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, screen, session, globalShortcut, dialog, Tray, Menu, protocol, desktopCapturer, powerMonitor, net: electronNet } = require('electron');
 const net = require('net');
 const http = require('http');
 const path = require('path');
@@ -2425,6 +2425,120 @@ function qqLoginCompletionFromCookie(cookieText) {
   return { ok: false, cancelled: true, message: 'QQ 登录窗口已关闭' };
 }
 
+const QQ_OAUTH_EXCHANGE_HOSTS = ['u.y.qq.com', 'szu.y.qq.com', 'shu.y.qq.com'];
+
+function qqOAuthCodeFromLoginUrl(targetUrl) {
+  try {
+    const parsed = new URL(String(targetUrl || ''));
+    if (parsed.protocol !== 'https:') return '';
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname !== 'y.qq.com' && !hostname.endsWith('.y.qq.com')) return '';
+    if (!/\/portal\/wx_redirect\.html$/i.test(parsed.pathname)) return '';
+    if (String(parsed.searchParams.get('login_type') || '') !== '1') return '';
+    const code = String(parsed.searchParams.get('code') || '').trim();
+    return /^[A-Za-z0-9._~-]{6,512}$/.test(code) ? code : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function qqGtkFromCookieText(cookieText) {
+  const obj = parseCookieHeader(cookieText);
+  const seed = obj.qqmusic_key || obj.p_skey || obj.skey || obj.p_lskey || obj.lskey || '';
+  let hash = 5381;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash += (hash << 5) + seed.charCodeAt(i);
+  }
+  return 2147483647 & hash;
+}
+
+function postQQLoginExchange(host, code, gTk, cookieSession) {
+  return new Promise((resolveResult) => {
+    const payload = JSON.stringify({
+      comm: { g_tk: gTk, platform: 'yqq', ct: 24, cv: 0 },
+      req: {
+        module: 'QQConnectLogin.LoginServer',
+        method: 'QQLogin',
+        param: { code },
+      },
+    });
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      resolveResult(value);
+    };
+    let request;
+    try {
+      request = electronNet.request({
+        method: 'POST',
+        url: `https://${host}/cgi-bin/musicu.fcg`,
+        session: cookieSession,
+        useSessionCookies: true,
+        redirect: 'follow',
+      });
+    } catch (e) {
+      done({ host, ok: false, error: e.message });
+      return;
+    }
+    const timer = setTimeout(() => {
+      try { request.abort(); } catch (_) {}
+      done({ host, ok: false, error: 'timeout' });
+    }, 12000);
+    request.setHeader('Accept', '*/*');
+    request.setHeader('Content-Type', 'application/x-www-form-urlencoded');
+    request.on('response', (response) => {
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('error', (e) => {
+        clearTimeout(timer);
+        done({ host, ok: false, error: e.message });
+      });
+      response.on('end', () => {
+        clearTimeout(timer);
+        const text = Buffer.concat(chunks).toString('utf8');
+        let body = null;
+        try { body = JSON.parse(text); } catch (_) {}
+        const req = body && body.req ? body.req : null;
+        const data = req && req.data ? req.data : {};
+        done({
+          host,
+          ok: !!(body && body.code === 0 && req && req.code === 0),
+          status: response.statusCode,
+          reqCode: req ? req.code : null,
+          message: (req && (req.msg || req.message)) || (body && body.msg) || '',
+          musicKeyReady: !!(data && data.musickey),
+          // Keep the diagnostic body only for failures: a successful payload
+          // carries access/refresh tokens that must never reach a log file.
+          bodyPreview: req && req.code === 0 ? '' : text.slice(0, 240),
+        });
+      });
+    });
+    request.on('error', (e) => {
+      clearTimeout(timer);
+      done({ host, ok: false, error: e.message });
+    });
+    request.end(payload);
+  });
+}
+
+// The official wx_redirect callback page exchanges the OAuth code from inside a
+// cross-origin iframe with a withCredentials XHR. When that request never runs
+// (or its Set-Cookie never lands) the page still looks logged out and qm_keyst
+// never appears. Replaying the exact official request from the main process on
+// the same login partition keeps authorization working in that case.
+async function exchangeQQOAuthCodeForPlayback(code, cookieSession) {
+  const cookieText = await readQQLoginCookieHeader(cookieSession);
+  const gTk = qqGtkFromCookieText(cookieText);
+  const attempts = [];
+  for (const host of QQ_OAUTH_EXCHANGE_HOSTS) {
+    const attempt = await postQQLoginExchange(host, code, gTk, cookieSession);
+    attempts.push(attempt);
+    if (attempt.ok) return { ok: true, attempts };
+  }
+  return { ok: false, attempts };
+}
+
 function neteaseCookieHasLogin(cookieText) {
   const obj = parseCookieHeader(cookieText);
   return !!obj.MUSIC_U;
@@ -2630,6 +2744,23 @@ async function openNeteaseMusicLoginWindow(owner) {
   });
 }
 
+const QQ_LOGIN_DEBUG_FILE = 'qq-login-debug.log';
+function qqLoginTrace(phase, detail) {
+  // Low-volume, always-on trace of the official QQ login window. Written to the
+  // userData directory so a normal packaged run can be inspected when the
+  // playback authorization (qm_keyst) never materializes after a successful scan.
+  try {
+    const file = path.join(app.getPath('userData'), QQ_LOGIN_DEBUG_FILE);
+    try {
+      const stat = fs.statSync(file);
+      if (stat && stat.size > 512 * 1024) fs.writeFileSync(file, '', 'utf8');
+    } catch (_) {}
+    const payload = { at: new Date().toISOString(), phase: String(phase || '') };
+    if (detail !== undefined) payload.detail = detail;
+    fs.appendFileSync(file, JSON.stringify(payload) + '\n', 'utf8');
+  } catch (_) {}
+}
+
 async function openQQMusicLoginWindow(owner, options) {
   options = options || {};
   const cookieSession = session.fromPartition(QQ_LOGIN_PARTITION);
@@ -2650,6 +2781,9 @@ async function openQQMusicLoginWindow(owner, options) {
     let warmupWindow = null;
     let playbackFinalizePending = false;
     let showWatchdog = null;
+    let lastTraceState = '';
+    let oauthRecoveryTimer = null;
+    let lastOAuthCode = '';
     const popupWindows = new Set();
 
     const loginWindow = new BrowserWindow({
@@ -2672,10 +2806,44 @@ async function openQQMusicLoginWindow(owner, options) {
       },
     });
 
+    qqLoginTrace('window-open', { partition: QQ_LOGIN_PARTITION, forceReauth: !!options.forceReauth });
+    const recoverQQOAuthCode = (targetUrl) => {
+      const code = qqOAuthCodeFromLoginUrl(targetUrl);
+      if (!code || code === lastOAuthCode) return;
+      lastOAuthCode = code;
+      qqLoginTrace('oauth-code-seen', { at: 'frame-navigation' });
+      // The callback page exchanges the code itself. Give it a moment, then
+      // replay the exchange only when no playback ticket exists yet.
+      if (oauthRecoveryTimer) clearTimeout(oauthRecoveryTimer);
+      oauthRecoveryTimer = setTimeout(async () => {
+        oauthRecoveryTimer = null;
+        if (settled) return;
+        try {
+          const current = await readQQLoginCookieHeader(cookieSession);
+          if (qqCookieHasPlaybackLogin(current)) return;
+          const outcome = await exchangeQQOAuthCodeForPlayback(code, cookieSession);
+          qqLoginTrace('oauth-exchange', outcome);
+          if (!outcome.ok) return;
+          try { await cookieSession.flushStorageData(); } catch (_) {}
+          await checkCookies();
+        } catch (e) {
+          qqLoginTrace('oauth-exchange-error', { message: e && e.message ? e.message : String(e) });
+        }
+      }, 1500);
+    };
+    loginWindow.webContents.on('did-frame-navigate', (_e, url, httpCode, status, isMainFrame) => {
+      qqLoginTrace('nav', { main: !!isMainFrame, http: httpCode, status, url: String(url || '').slice(0, 320) });
+      if (String(url || '').includes('wx_redirect.html')) recoverQQOAuthCode(url);
+    });
+
     const closeAuxiliaryWindows = () => {
       if (showWatchdog) {
         clearTimeout(showWatchdog);
         showWatchdog = null;
+      }
+      if (oauthRecoveryTimer) {
+        clearTimeout(oauthRecoveryTimer);
+        oauthRecoveryTimer = null;
       }
       if (warmupTimer) {
         clearTimeout(warmupTimer);
@@ -2697,6 +2865,7 @@ async function openQQMusicLoginWindow(owner, options) {
       settled = true;
       if (pollTimer) clearInterval(pollTimer);
       closeAuxiliaryWindows();
+      qqLoginTrace('finish', { ok: !!(result && result.ok), partial: !!(result && result.partial), error: (result && result.error) || '' });
       try { await cookieSession.flushStorageData(); } catch (_) {}
       if (loginWindow && !loginWindow.isDestroyed()) {
         loginWindow.close();
@@ -2759,7 +2928,19 @@ async function openQQMusicLoginWindow(owner, options) {
     const checkCookies = async () => {
       try {
         const cookie = await readQQLoginCookieHeader(cookieSession);
-        if (qqCookieHasPlaybackLogin(cookie)) {
+        const hasPlayback = qqCookieHasPlaybackLogin(cookie);
+        const hasLogin = qqCookieHasLogin(cookie);
+        const traceState = hasPlayback ? 'playback' : (hasLogin ? 'login-only' : 'anonymous');
+        if (traceState !== lastTraceState) {
+          lastTraceState = traceState;
+          const names = new Set();
+          String(cookie || '').split(';').forEach((part) => {
+            const idx = part.indexOf('=');
+            if (idx > 0) names.add(part.slice(0, idx).trim());
+          });
+          qqLoginTrace('cookie-state', { state: traceState, names: Array.from(names), hasUin: /(?:^|;\s*)(?:uin|qqmusic_uin|wxuin|p_uin)=/.test(cookie) });
+        }
+        if (hasPlayback) {
           if (playbackFinalizePending) return;
           playbackFinalizePending = true;
           // QQ writes the playback ticket and profile/refresh cookies in a
@@ -2770,7 +2951,7 @@ async function openQQMusicLoginWindow(owner, options) {
             ok: true,
             cookie: qqCookieHasPlaybackLogin(finalizedCookie) ? finalizedCookie : cookie,
           });
-        } else if (qqCookieHasLogin(cookie)) {
+        } else if (hasLogin) {
           schedulePlaybackWarmup();
         }
       } catch (e) {
@@ -2782,7 +2963,9 @@ async function openQQMusicLoginWindow(owner, options) {
     const installQQLoginWindowHandlers = (win, isRoot) => {
       if (!win || win.isDestroyed()) return;
       win.webContents.setWindowOpenHandler(({ url }) => {
-        if (isTrustedQQLoginUrl(url)) {
+        const trusted = isTrustedQQLoginUrl(url);
+        qqLoginTrace('window-open-request', { root: !!isRoot, trusted, url: String(url || '').slice(0, 320) });
+        if (trusted) {
           return {
             action: 'allow',
             overrideBrowserWindowOptions: {
@@ -2811,6 +2994,12 @@ async function openQQMusicLoginWindow(owner, options) {
       win.webContents.on('did-create-window', (child) => {
         popupWindows.add(child);
         child.on('closed', () => popupWindows.delete(child));
+        try {
+          child.webContents.on('did-frame-navigate', (_e, url, httpCode, status, isMainFrame) => {
+            qqLoginTrace('child-nav', { main: !!isMainFrame, http: httpCode, url: String(url || '').slice(0, 320) });
+            if (String(url || '').includes('wx_redirect.html')) recoverQQOAuthCode(url);
+          });
+        } catch (_) {}
         installQQLoginWindowHandlers(child, false);
       });
       if (!isRoot) win.webContents.on('did-finish-load', checkCookies);
@@ -2822,14 +3011,24 @@ async function openQQMusicLoginWindow(owner, options) {
       showLoginWindow();
       loginWindow.webContents.executeJavaScript(`
         setTimeout(() => {
+          // Match only a short login label and prefer the smallest leaf node.
+          // A loose text match picks the whole header container and the click
+          // never opens the official login modal.
           const nodes = Array.from(document.querySelectorAll('a, button, span, div'));
-          const loginNode = nodes.find((node) => {
-            const text = (node.textContent || '').trim();
-            if (!/登录|登陆/.test(text)) return false;
-            const rect = node.getBoundingClientRect();
-            return rect.width > 0 && rect.height > 0;
-          });
-          if (loginNode) loginNode.click();
+          const pick = (matcher) => {
+            let target = null;
+            for (const node of nodes) {
+              const text = (node.textContent || '').trim();
+              if (!matcher(text)) continue;
+              const rect = node.getBoundingClientRect();
+              if (rect.width <= 0 || rect.height <= 0) continue;
+              if (!target || node.childElementCount < target.childElementCount) target = node;
+            }
+            return target;
+          };
+          const target = pick((text) => /^(登录|登陆)$/.test(text)) ||
+            pick((text) => text.length <= 6 && /登录|登陆/.test(text));
+          if (target) target.click();
         }, 700);
       `, true).catch(() => {});
     });
@@ -2843,6 +3042,7 @@ async function openQQMusicLoginWindow(owner, options) {
       try {
         const cookie = await readQQLoginCookieHeader(cookieSession);
         try { await cookieSession.flushStorageData(); } catch (_) {}
+        qqLoginTrace('window-closed', { playbackKeyReady: qqCookieHasPlaybackLogin(cookie) });
         resolve(qqLoginCompletionFromCookie(cookie));
       } catch (e) {
         resolve({ ok: false, error: e.message || 'QQ 登录窗口已关闭' });
@@ -2940,14 +3140,24 @@ async function openKugouMusicLoginWindow(owner, options) {
       checkCookies();
       loginWindow.webContents.executeJavaScript(`
         setTimeout(() => {
+          // Match only a short login label and prefer the smallest leaf node.
+          // A loose text match picks the whole header container and the click
+          // never opens the official login modal.
           const nodes = Array.from(document.querySelectorAll('a, button, span, div'));
-          const loginNode = nodes.find((node) => {
-            const text = (node.textContent || '').trim();
-            if (!/登录|登陆/.test(text)) return false;
-            const rect = node.getBoundingClientRect();
-            return rect.width > 0 && rect.height > 0;
-          });
-          if (loginNode) loginNode.click();
+          const pick = (matcher) => {
+            let target = null;
+            for (const node of nodes) {
+              const text = (node.textContent || '').trim();
+              if (!matcher(text)) continue;
+              const rect = node.getBoundingClientRect();
+              if (rect.width <= 0 || rect.height <= 0) continue;
+              if (!target || node.childElementCount < target.childElementCount) target = node;
+            }
+            return target;
+          };
+          const target = pick((text) => /^(登录|登陆)$/.test(text)) ||
+            pick((text) => text.length <= 6 && /登录|登陆/.test(text));
+          if (target) target.click();
         }, 700);
       `, true).catch(() => {});
     });

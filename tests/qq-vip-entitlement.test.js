@@ -566,6 +566,66 @@ function testDesktopReauthCookieSelectionAndBudgets() {
   );
 }
 
+function extractNamedFunction(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert(start >= 0, `main.js must define ${name}`);
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  for (let i = open; i < source.length; i += 1) {
+    if (source[i] === '{') depth += 1;
+    else if (source[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  throw new Error(`unterminated ${name}`);
+}
+
+function testOAuthCallbackRecoveryExchange() {
+  const mainSource = fs.readFileSync(path.join(ROOT, 'desktop/main.js'), 'utf8');
+
+  assert(
+    /function qqOAuthCodeFromLoginUrl[\s\S]{0,600}wx_redirect[\s\S]{0,300}searchParams\.get\('login_type'\)/.test(mainSource),
+    'the official wx_redirect callback must be recognised so its code can be recovered'
+  );
+  assert(
+    /module:\s*'QQConnectLogin\.LoginServer'[\s\S]{0,160}method:\s*'QQLogin'/.test(mainSource) &&
+      /useSessionCookies:\s*true/.test(mainSource),
+    'the recovery exchange must replay the official QQLogin request on the login partition'
+  );
+  assert(
+    /const outcome = await exchangeQQOAuthCodeForPlayback\(code, cookieSession\);[\s\S]{0,400}await checkCookies\(\);/.test(mainSource),
+    'a recovered playback ticket must feed the normal completion check'
+  );
+  assert(
+    /did-frame-navigate[\s\S]{0,400}wx_redirect\.html'\)\) recoverQQOAuthCode\(url\)/.test(mainSource),
+    'captured OAuth callbacks must trigger recovery for main and popup windows'
+  );
+
+  const sandbox = { URL };
+  vm.runInNewContext(
+    [
+      extractNamedFunction(mainSource, 'parseCookieHeader'),
+      extractNamedFunction(mainSource, 'qqGtkFromCookieText'),
+      extractNamedFunction(mainSource, 'qqOAuthCodeFromLoginUrl'),
+      'this.gtk = qqGtkFromCookieText; this.code = qqOAuthCodeFromLoginUrl;',
+    ].join('\n'),
+    sandbox
+  );
+
+  // g_tk must match the official wx_redirect algorithm byte for byte.
+  assert.strictEqual(sandbox.gtk('p_skey=FAKEPSKEY123'), 705997854);
+  assert.strictEqual(sandbox.gtk('skey=FAKEPSKEY123'), 705997854);
+  assert.strictEqual(sandbox.gtk(''), 5381);
+
+  const callback = 'https://y.qq.com/portal/wx_redirect.html?code=ABCDEF12&login_type=1&surl=https%3A%2F%2Fy.qq.com%2Fn%2Fryqq%2Fprofile';
+  assert.strictEqual(sandbox.code(callback), 'ABCDEF12');
+  assert.strictEqual(sandbox.code(callback.replace('login_type=1', 'login_type=2')), '', 'WeChat callbacks use a different endpoint');
+  assert.strictEqual(sandbox.code(callback.replace('y.qq.com/portal', 'evil.example/portal')), '', 'foreign hosts must never be treated as the callback');
+  assert.strictEqual(sandbox.code(callback.replace('code=ABCDEF12&', '')), '', 'a callback without a code must not trigger recovery');
+  assert.strictEqual(sandbox.code(callback.replace('https:', 'http:')), '', 'only https callbacks are trusted');
+}
+
 function testPackagingIncludesQQVipModule() {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
   const files = pkg && pkg.build && pkg.build.files || [];
@@ -580,6 +640,7 @@ async function main() {
   testStalePositiveProtectionAndRights();
   await testTransientFrontendFailureKeepsLastKnownGood();
   testDesktopReauthCookieSelectionAndBudgets();
+  testOAuthCallbackRecoveryExchange();
   testPackagingIncludesQQVipModule();
   console.log('[OK] QQ VIP entitlement regression tests passed');
 }
