@@ -618,6 +618,20 @@ function testOAuthCallbackRecoveryExchange() {
   assert.strictEqual(sandbox.gtk('skey=FAKEPSKEY123'), 705997854);
   assert.strictEqual(sandbox.gtk(''), 5381);
 
+  // The trace file is meant to be shareable, so OAuth credentials must be masked.
+  const sanitizeSandbox = {};
+  vm.runInNewContext(
+    `${extractNamedFunction(mainSource, 'qqLoginTraceSanitize')}\nthis.sanitize = qqLoginTraceSanitize;`,
+    sanitizeSandbox
+  );
+  const sanitized = sanitizeSandbox.sanitize({
+    url: 'https://y.qq.com/portal/wx_redirect.html?code=SECRET123&login_type=1&surl=x',
+    nested: ['https://a.test/x?access_token=TOKEN&b=1'],
+  });
+  assert(!JSON.stringify(sanitized).includes('SECRET123'), 'OAuth codes must not reach the login trace');
+  assert(!JSON.stringify(sanitized).includes('TOKEN'), 'access tokens must not reach the login trace');
+  assert(sanitized.url.includes('login_type=1'), 'non-secret callback parameters must survive redaction');
+
   const callback = 'https://y.qq.com/portal/wx_redirect.html?code=ABCDEF12&login_type=1&surl=https%3A%2F%2Fy.qq.com%2Fn%2Fryqq%2Fprofile';
   assert.strictEqual(sandbox.code(callback), 'ABCDEF12');
   assert.strictEqual(sandbox.code(callback.replace('login_type=1', 'login_type=2')), '', 'WeChat callbacks use a different endpoint');
