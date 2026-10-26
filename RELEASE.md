@@ -32,7 +32,7 @@ GitHub Release 上传 `dist/LanTing-2.3.1-Setup.exe` 和 `docs/update/latest.yml
 
 2.1.0 的备用检测和入口限制见 [更新公告与旧版兼容](docs/UPDATE_DELIVERY.md)。每次发布都要同步版本说明；缺失会使主接口访问失败的旧客户端无法发现更新。
 
-安装包 SHA-256：`39fc604c123872f4dbb5bd5d59dd82997d75c04626e88efc1afb6b511338e6ca`。
+安装包 SHA-256：`7bc29eafda79d20af9d4399ad8815ea33b6bb0f8ac7961506c503a870d52f6ea`。
 
 ## 发布前检查
 

@@ -2508,9 +2508,15 @@ function postQQLoginExchange(host, code, gTk, cookieSession) {
           reqCode: req ? req.code : null,
           message: (req && (req.msg || req.message)) || (body && body.msg) || '',
           musicKeyReady: !!(data && data.musickey),
-          // Keep the diagnostic body only for failures: a successful payload
-          // carries access/refresh tokens that must never reach a log file.
-          bodyPreview: req && req.code === 0 ? '' : text.slice(0, 240),
+          // Compact, non-identifying failure summary. A successful payload holds
+          // access/refresh tokens and must never reach a log file, and raw bodies
+          // can carry userip/encryptUin.
+          failurePreview: req && req.code === 0 ? '' : JSON.stringify({
+            code: body && body.code,
+            reqCode: req && req.code,
+            msg: (req && (req.msg || req.message)) || '',
+            errTip: (data && (data.errtip || data.errTip2 || data.tip3)) || '',
+          }),
         });
       });
     });
@@ -2745,6 +2751,21 @@ async function openNeteaseMusicLoginWindow(owner) {
 }
 
 const QQ_LOGIN_DEBUG_FILE = 'qq-login-debug.log';
+function qqLoginTraceSanitize(value) {
+  if (typeof value === 'string') {
+    // OAuth codes and access tokens are single-use credentials; the trace is
+    // meant to be shareable when diagnosing a failed login.
+    return value.replace(/([?&](?:code|access_token|refresh_token)=)[^&#\s]+/gi, '$1<redacted>');
+  }
+  if (Array.isArray(value)) return value.map(qqLoginTraceSanitize);
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const key of Object.keys(value)) out[key] = qqLoginTraceSanitize(value[key]);
+    return out;
+  }
+  return value;
+}
+
 function qqLoginTrace(phase, detail) {
   // Low-volume, always-on trace of the official QQ login window. Written to the
   // userData directory so a normal packaged run can be inspected when the
@@ -2756,7 +2777,7 @@ function qqLoginTrace(phase, detail) {
       if (stat && stat.size > 512 * 1024) fs.writeFileSync(file, '', 'utf8');
     } catch (_) {}
     const payload = { at: new Date().toISOString(), phase: String(phase || '') };
-    if (detail !== undefined) payload.detail = detail;
+    if (detail !== undefined) payload.detail = qqLoginTraceSanitize(detail);
     fs.appendFileSync(file, JSON.stringify(payload) + '\n', 'utf8');
   } catch (_) {}
 }
@@ -2823,7 +2844,7 @@ async function openQQMusicLoginWindow(owner, options) {
           if (qqCookieHasPlaybackLogin(current)) return;
           const outcome = await exchangeQQOAuthCodeForPlayback(code, cookieSession);
           qqLoginTrace('oauth-exchange', outcome);
-          if (!outcome.ok) return;
+          if (!outcome.ok || settled) return;
           try { await cookieSession.flushStorageData(); } catch (_) {}
           await checkCookies();
         } catch (e) {

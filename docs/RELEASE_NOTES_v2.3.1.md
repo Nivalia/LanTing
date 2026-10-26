@@ -8,6 +8,6 @@
 
 安装包：`LanTing-2.3.1-Setup.exe`（见 Release 的 Assets）。
 
-SHA-256：`39fc604c123872f4dbb5bd5d59dd82997d75c04626e88efc1afb6b511338e6ca`。
+SHA-256：`7bc29eafda79d20af9d4399ad8815ea33b6bb0f8ac7961506c503a870d52f6ea`。
 
 <!-- lanting-download-page: 直接下载|https://github.com/Nivalia/LanTing/releases/download/v2.3.1/LanTing-2.3.1-Setup.exe -->
